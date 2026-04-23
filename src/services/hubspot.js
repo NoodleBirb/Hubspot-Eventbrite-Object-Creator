@@ -77,8 +77,70 @@ async function getCourses(limit = 10) {
   }
 }
 
+/**
+ * Get all marketing events from HubSpot
+ * @param {number} limit - Max number of events to retrieve per page
+ * @returns {Promise<Array>} - Array of marketing event objects
+ */
+async function getMarketingEvents(limit = 100) {
+  try {
+    console.log('Fetching marketing events from HubSpot...');
+    const https = require('https');
+    
+    // Specify which properties we need
+    const properties = [
+      'eventName',
+      'startDateTime',
+      'endDateTime'
+    ];
+    
+    const propertiesParam = properties.map(p => `properties=${p}`).join('&');
+    
+    return new Promise((resolve, reject) => {
+      const token = process.env.HUBSPOT_API_TOKEN;
+      const options = {
+        hostname: 'api.hubapi.com',
+        path: `/marketing/marketing-events/2026-03?limit=${limit}&${propertiesParam}`,
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      };
+
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          try {
+            if (res.statusCode === 200) {
+              const parsed = JSON.parse(data);
+              resolve(parsed.results || []);
+            } else {
+              const errorData = JSON.parse(data);
+              reject(new Error(`HTTP ${res.statusCode}: ${errorData.message || 'Unknown error'}`));
+            }
+          } catch (e) {
+            reject(new Error(`Error parsing marketing events response: ${e.message}`));
+          }
+        });
+      });
+
+      req.on('error', (err) => {
+        reject(new Error(`Error fetching marketing events: ${err.message}`));
+      });
+
+      req.end();
+    });
+  } catch (error) {
+    console.error('Error fetching marketing events:', error.message);
+    throw error;
+  }
+}
+
 module.exports = {
   createCourse,
   getCourseByNameAndDate,
-  getCourses
+  getCourses,
+  getMarketingEvents
 };

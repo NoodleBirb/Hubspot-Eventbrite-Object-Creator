@@ -185,9 +185,63 @@ async function createTrainingFromEvent(event) {
   };
 }
 
+/**
+ * Create courses from a Marketing Event (called by polling service)
+ * @param {Object} event - The Marketing Event from HubSpot API
+ * @param {Array<string>} dates - Array of dates extracted by polling service
+ * @returns {Promise<Object>} - Result with success flag and course count
+ */
+async function createCoursesFromMarketingEvent(event, dates) {
+  const coursesCreated = [];
+  const errors = [];
+
+  for (const dateOrRange of dates) {
+    try {
+      // dateOrRange is either "YYYY-MM-DD" or "YYYY-MM-DD:YYYY-MM-DD"
+      let courseName;
+      if (dateOrRange.includes(':')) {
+        // Date range
+        courseName = `${event.eventName} - ${dateOrRange.replace(':', ' to ')}`;
+      } else {
+        // Single date
+        courseName = `${event.eventName} - ${dateOrRange}`;
+      }
+
+      // Create the course
+      const courseData = {
+        hs_course_name: courseName,
+        // Optional: store reference to the source event
+        // hs_event_id: event.objectId,
+        // hs_event_name: event.eventName
+      };
+
+      const createdCourse = await hubspotService.createCourse(courseData);
+      console.log(`✓ Created course: ${courseName} (ID: ${createdCourse.id})`);
+      coursesCreated.push({
+        name: courseName,
+        id: createdCourse.id
+      });
+    } catch (error) {
+      console.error(`✗ Error creating course for date ${dateOrRange}:`, error.message);
+      errors.push({
+        date: dateOrRange,
+        error: error.message
+      });
+    }
+  }
+
+  return {
+    success: errors.length === 0,
+    coursesCreated: coursesCreated.length,
+    courses: coursesCreated,
+    errors
+  };
+}
+
 module.exports = {
   parseEventDates,
   generateCourseNames,
   createTrainingFromEvent,
+  createCoursesFromMarketingEvent,
   formatDate
 };
